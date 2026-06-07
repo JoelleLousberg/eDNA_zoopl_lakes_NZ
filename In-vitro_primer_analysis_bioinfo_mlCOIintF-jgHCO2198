@@ -1,15 +1,4 @@
-rm(list= ls())
-#libraries
-#if (!requireNamespace("BiocManager", quietly = TRUE))
- # install.packages("BiocManager")
-#BiocManager::install("Biostrings")
-#BiocManager::install("DECIPHER")
-#BiocManager::install("dada2")
-#BiocManager::install("phyloseq")
-
-
 library(phyloseq)
-#library(DECIPHER)
 library(Rcpp)
 library(dada2)
 library(ShortRead)
@@ -17,7 +6,6 @@ library(Biostrings)
 library(ggplot2)
 library(stringr) # not strictly required but handy
 library(readr)
-###set.seed(106)
 library(seqinr)
 library(data.table)
 library(plyr)
@@ -31,14 +19,12 @@ list.files(path)
 
 #I only want certain samples from my list actually having the mlCOI/jgHCO primers,
 #in this case 21,26-32.
-
 # Forward reads
 fnFs <- sort(list.files(
   path,
   pattern = "(CAW-25-11-001|CAW-25-11-004|CAW-25-11-017|CAW-25-11-020|CAW-25-11-0(2[2-4])|CAW-25-36-021|CAW-25-36-0(2[6-9]|3[0-2])).*R1_001.fastq.gz$",
   full.names = TRUE
 ))
-
 # Reverse reads
 fnRs <- sort(list.files(
   path,
@@ -46,7 +32,7 @@ fnRs <- sort(list.files(
   full.names = TRUE
 ))
 
-###Instead here the old code that includes all files:
+###Instead here the chunk that includes all files:
 #fnFs <- sort(list.files(path, pattern = "R1_001.fastq.gz", full.names = TRUE))
 #fnRs <- sort(list.files(path, pattern = "R2_001.fastq.gz", full.names = TRUE))
 
@@ -76,14 +62,10 @@ rbind(FWD.ForwardReads = sapply(FWD.orients, primerHits, fn = fnFs[[1]]),
 
 
 ###Using cutadapt for trimming the primers off
-
 cutadapt <- "/home/john/miniconda3/bin/cutadapt"
-
 system2(cutadapt, args = "--version") 
 
-
 ###create path
-
 path.cut <- file.path(path, "mlCO1_all/cutadapt")
 if(!dir.exists(path.cut)) dir.create(path.cut)
 fnFs.cut <- file.path(path.cut, basename(fnFs))
@@ -165,31 +147,25 @@ rev_qual_plots
 dev.off()
 
 
-
 ##______________________________________________________________________
 ##See results from quality plots and trim accordingly
 
 filtpathF <- file.path(path.cut, "filtered", basename(cutFs))
 filtpathR <- file.path(path.cut, "filtered", basename(cutRs))
 
-
 out <- filterAndTrim(cutFs, filtpathF, cutRs, filtpathR,
                      truncLen=c(165,165), maxEE=c(4,6), truncQ=2, maxN=0, rm.phix=TRUE,
                      compress=TRUE, verbose=TRUE, multithread=TRUE)
-
 
 out2 <- as.data.frame(out)
 str(out2)
 out2$perc <- (out2$reads.out/out2$reads.in)*100
 out2
-
 #check if rows = 0
 
 data <- as.data.frame(out) 
 rows_with_zero <- which(data$reads.in == 0 | data$reads.out == 0)
 print(rows_with_zero)
-
-
 
 
 sample.names <- sapply(strsplit(basename(filtpathF), "_"), `[`, 1) # Assumes filename = samplename_XXX.fastq.gz
@@ -199,15 +175,12 @@ if(identical(sample.names, sample.namesR)) {print("Files are still matching.....
 names(filtpathF) <- sample.names
 names(filtpathR) <- sample.namesR
 
-
 filtpathF2 <- filtpathF[-c(14, 15)] ##remove water blank - no sequences
 filtpathR2 <- filtpathR[-c(14, 15)] ##remove water blank - no sequences
-
 set.seed(100) # set seed to ensure that randomized steps are replicatable
 
 # Learn forward error rates
 library(magrittr)
-
 loessErrfun_mod <- function (trans) {
   qq <- as.numeric(colnames(trans))
   est <- matrix(0, nrow = 0, ncol = length(qq))
@@ -255,13 +228,9 @@ loessErrfun_mod <- function (trans) {
 }
 ###
 # Learn error rates
-
 errF <- learnErrors(filtpathF2, nbases=1e8, errorEstimationFunction = loessErrfun_mod, multithread=TRUE, verbose = TRUE)
-
 errR <- learnErrors(filtpathR2, nbases=1e8, errorEstimationFunction = loessErrfun_mod, multithread=TRUE, verbose = TRUE)
-
 ###plot errors
-
 jpeg(file="mlCO1_all/mlCO1_all.Error.F.Plot.jpg",res=300, width=15, height=8, units="in")
 plotErrors(errF, nominalQ=TRUE)
 dev.off()
@@ -288,12 +257,8 @@ colnames(track) <- c("input", "filtered", "denoisedF", "denoisedR", "merged")
 rownames(track) <- sample.names[-c(14, 15)]
 
 write.csv(track,"mlCO1_all/mlCO1_all.track.csv")
-
 track
-
-
 seqtab <- makeSequenceTable(mergers)
-
 saveRDS(seqtab, "mlCO1_all/mlCO1_all.seqtab.rds")
 
 
@@ -310,33 +275,26 @@ library(ggplot2)
 g <- ggplot(trimtable, aes(x = Length.bp, y = Frequency)) +
   geom_bar(stat="identity")
 
-
 jpeg(file="mlCO1_all/mlCO1_all.Chim.Dist.Plot.jpg",res=300, width=30, height=8, units="in")
 g
 dev.off()
 
 
-##checking for chimeras (sequences outside the expected size range) Look at table to figure out spread (min,max for amplicon size)
-
+##checking for chimeras (Look at table to figure out min,max for amplicon size)
 seqtab2 <- seqtab[,nchar(colnames(seqtab)) %in% seq(310,316)]
-
 seqtab.nochim <- removeBimeraDenovo(seqtab2, multithread=TRUE, verbose=TRUE)
 saveRDS(seqtab.nochim, "mlCO1_all/mlCO1_all.seqtab.nochim.rds")
 
 ###Produce a table which shows the number or reads at each stage
-
 getN <- function(x) sum(getUniques(x))
 track2 <- cbind(out[-c(14, 15), ],sapply(dadaF.pseudo, getN), sapply(dadaR.pseudo, getN), sapply(mergers, getN), rowSums(seqtab.nochim))
 colnames(track2) <- c("input", "filtered", "denoisedF", "denoisedR", "merged", "nonchim")
 rownames(track2) <- sample.names[-c(14, 15)]
-
 write.csv(track2, "mlCO1_all/mlCO1_all.track2.csv")  
-
 track2
-###Do only Blast/Megan taxonomy. 
+
 
 ###turn rds into file that can be used for blast
-
 seqtab.nochim <- readRDS("mlCO1_all/mlCO1_all.seqtab.nochim.rds")
 
 asv_seqs <- colnames(seqtab.nochim)
@@ -359,7 +317,6 @@ row.names(asv_tab) <- sub(">", "", asv_headers)
 write.table(asv_tab, "mlCO1_all/mlCO1_all.nochim_ASVs_counts.tsv", sep="\t", quote=F, col.names=NA)
 
 
-
-
-##blast code - run in HPC terminal 1 after navigating to the correct folder mlCO1_all (Change the query & o)
+#BLASTING:
+##blast code - run in HPC terminal 1 after navigating to the correct folder mlCO1_all
 #blastn -query mlCO1_all.nochim_ASVs.fa -db ~/../../srv/referencedb/COI/COI.NCBI.BOLD.blast.db -out mlCO1_all.nochim_ASVs_blast_BOLD.txt -num_threads 20 -max_target_seqs 10 -perc_identity 70 -qcov_hsp_perc 80
