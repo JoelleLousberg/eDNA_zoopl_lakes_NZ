@@ -1,39 +1,4 @@
-#Create a new folder for my fasta files on HDrive
-rm(list= ls())
-setwd("H:/Joelle.Lousberg/CAW-26-06_Joelle_Ch2_step3_fwh/CAW-26-06_fasta")
-my_dirs <- list.files("H:/Joelle.Lousberg/CAW-26-06_Joelle_Ch2_step3_fwh/CAW-26-06_fasta", 
-                      pattern = "CAW-26-06-",
-                      recursive = TRUE, include.dirs = TRUE)
-
-files <- sapply(my_dirs,list.files, full.names=TRUE)
-new_dir <- "All_sequences"
-dir.create(new_dir, recursive = TRUE)
-
-for(file in files) {
-  file.copy(file, new_dir)
-}
-
-
-
-
-##Run on HPC terminal 1
-
-
-
-
-
-rm(list= ls())
-#libraries
-#if (!requireNamespace("BiocManager", quietly = TRUE))
- # install.packages("BiocManager")
-#BiocManager::install("Biostrings")
-#BiocManager::install("DECIPHER")
-#BiocManager::install("dada2")
-#BiocManager::install("phyloseq")
-
-
 library(phyloseq)
-#library(DECIPHER)
 library(Rcpp)
 library(dada2)
 library(ShortRead)
@@ -41,7 +6,6 @@ library(Biostrings)
 library(ggplot2)
 library(stringr) # not strictly required but handy
 library(readr)
-###set.seed(106)
 library(seqinr)
 library(data.table)
 library(plyr)
@@ -49,7 +13,6 @@ library(tidyverse)
 
 ###Choose your working directory
 setwd("/srv/users/Joelle/CAW-26-06/")
-
 path <- "/srv/users/Joelle/CAW-26-06/"
 
 list.files(path)
@@ -71,7 +34,7 @@ list.files(path)
 #  full.names = TRUE
 #))
 
-###Instead here the old code that includes all files:
+###Instead here the code that includes all files:
 fnFs <- sort(list.files(path, pattern = "R1_001.fastq.gz", full.names = TRUE))
 fnRs <- sort(list.files(path, pattern = "R2_001.fastq.gz", full.names = TRUE))
 
