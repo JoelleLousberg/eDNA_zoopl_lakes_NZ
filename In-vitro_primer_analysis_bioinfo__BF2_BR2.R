@@ -1,15 +1,5 @@
-rm(list= ls())
-#libraries
-#if (!requireNamespace("BiocManager", quietly = TRUE))
- # install.packages("BiocManager")
-#BiocManager::install("Biostrings")
-#BiocManager::install("DECIPHER")
-#BiocManager::install("dada2")
-#BiocManager::install("phyloseq")
-
 
 library(phyloseq)
-#library(DECIPHER)
 library(Rcpp)
 library(dada2)
 library(ShortRead)
@@ -17,14 +7,12 @@ library(Biostrings)
 library(ggplot2)
 library(stringr) # not strictly required but handy
 library(readr)
-###set.seed(106)
 library(seqinr)
 library(data.table)
 library(plyr)
 
 ###Choose your working directory
 setwd("/srv/users/Joelle/CAW-25-36/")
-
 path <- "/srv/users/Joelle/CAW-25-36/"
 
 list.files(path)
@@ -46,7 +34,7 @@ fnRs <- sort(list.files(
   full.names = TRUE
 ))
 
-###Instead here the old code that includes all files:
+###Instead here the code that includes all files:
 #fnFs <- sort(list.files(path, pattern = "R1_001.fastq.gz", full.names = TRUE))
 #fnRs <- sort(list.files(path, pattern = "R2_001.fastq.gz", full.names = TRUE))
 
@@ -334,6 +322,6 @@ row.names(asv_tab) <- sub(">", "", asv_headers)
 write.table(asv_tab, "BF2BR2_CO1/BF2BR2_CO1.nochim_ASVs_counts.tsv", sep="\t", quote=F, col.names=NA)
 
 
-##blast code - run in HPC terminal 1
+##BLAST code
 # blastn -query BF2BR2_CO1.nochim_ASVs.fa -db ~/../../srv/referencedb/COI/COI.NCBI.BOLD.blast.db -out BF2BR2_CO1.nochim_ASVs_blast_BOLD.txt -num_threads 20 -max_target_seqs 10 -perc_identity 70 -qcov_hsp_perc 80
 
