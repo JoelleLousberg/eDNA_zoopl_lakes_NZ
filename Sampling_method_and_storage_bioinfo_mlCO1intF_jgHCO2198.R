@@ -1,39 +1,5 @@
-#Create a new folder for my fasta files on HDrive
-rm(list= ls())
-setwd("H:/Joelle.Lousberg/CAW-26-07_Joelle_Ch2_step3_Uni18S_mlCO1/CAW-26-07_fasta")
-my_dirs <- list.files("H:/Joelle.Lousberg/CAW-26-07_Joelle_Ch2_step3_Uni18S_mlCO1/CAW-26-07_fasta", 
-                      pattern = "CAW-26-07-",
-                      recursive = TRUE, include.dirs = TRUE)
-
-files <- sapply(my_dirs,list.files, full.names=TRUE)
-new_dir <- "All_sequences"
-dir.create(new_dir, recursive = TRUE)
-
-for(file in files) {
-  file.copy(file, new_dir)
-}
-
-
-
-
-##Run on HPC terminal 1 (Starte here Friday)
-
-
-
-
-
-rm(list= ls())
-#libraries
-#if (!requireNamespace("BiocManager", quietly = TRUE))
- # install.packages("BiocManager")
-#BiocManager::install("Biostrings")
-#BiocManager::install("DECIPHER")
-#BiocManager::install("dada2")
-#BiocManager::install("phyloseq")
-
 
 library(phyloseq)
-#library(DECIPHER)
 library(Rcpp)
 library(dada2)
 library(ShortRead)
@@ -41,7 +7,6 @@ library(Biostrings)
 library(ggplot2)
 library(stringr) # not strictly required but handy
 library(readr)
-###set.seed(106)
 library(seqinr)
 library(data.table)
 library(plyr)
@@ -49,7 +14,6 @@ library(tidyverse)
 
 ###Choose your working directory
 setwd("/srv/users/Joelle/CAW-26-07")
-
 path <- "/srv/users/Joelle/CAW-26-07"
 
 list.files(path)
@@ -333,8 +297,6 @@ asv_tab <- t(seqtab.nochim)
 row.names(asv_tab) <- sub(">", "", asv_headers)
 write.table(asv_tab, "mlCO1/mlCO1.nochim_ASVs_counts.tsv", sep="\t", quote=F, col.names=NA)
 
-##blast code - run in HPC terminal 1
+##blast code
 #blastn -query mlCO1.nochim_ASVs.fa -db ~/../../srv/referencedb/COI/COI.NCBI.BOLD.blast.db -out mlCO1.nochim_ASVs_blast_BOLD.txt -num_threads 20 -max_target_seqs 10 -perc_identity 70 -qcov_hsp_perc 80
-
-#scp john@bio-tr:\srv\users\Joelle\CAW-26-07\mlCO1\mlCO1* H:/Joelle.Lousberg/CAW-26-07_Joelle_Ch2_step3_Uni18S_mlCO1
 
