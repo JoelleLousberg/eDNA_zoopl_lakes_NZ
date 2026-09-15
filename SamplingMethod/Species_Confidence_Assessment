@@ -1,0 +1,362 @@
+
+## CONFIDENCE ASSESSMENT ACROSS 3 PRIMERS
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(openxlsx)
+
+
+
+## 1. Read the three primer tables
+
+fwh <- read_csv(
+  "fwh_Rare_zooplspecies_relabund_and_reads_permethod_andlake.csv",
+  show_col_types = FALSE
+) |>
+  mutate(Primer = "fwh")
+
+mlco1 <- read_csv(
+  "mlCO1_Rare_zooplspecies_relabund_and_reads_permethod_andlake.csv",
+  show_col_types = FALSE
+) |>
+  mutate(Primer = "mlCO1")
+
+uni18s <- read_csv(
+  "Uni18S_Rare_zooplspecies_relabund_and_reads_permethod_andlake.csv",
+  show_col_types = FALSE
+) |>
+  mutate(Primer = "Uni18S")
+
+
+
+## 2. Combine all three primer tables
+
+
+all_primers <- bind_rows(
+  fwh,
+  mlco1,
+  uni18s
+)
+
+
+
+## 3. Clean species and collection-method names
+
+
+all_primers <- all_primers |>
+  mutate(
+    
+    # Treat lake ID/name consistently
+    Lake = as.character(Lake),
+    
+    # Clean species names:
+    # s__Boeckella hamata; -> Boeckella hamata
+    Species_clean = as.character(Species),
+    Species_clean = str_remove(Species_clean, "^s__"),
+    Species_clean = str_remove(Species_clean, ";+$"),
+    Species_clean = str_trim(Species_clean),
+    
+    # Standardise collection method names
+    Collection_Method = as.character(Collection_Method),
+    Collection_Method = str_to_lower(Collection_Method),
+    Collection_Method = str_trim(Collection_Method),
+    
+    # Remove spaces, underscores and hyphens so e.g.
+    # "water 1", "water_1" and "water-1" all become "water1"
+    Collection_Method = str_replace_all(
+      Collection_Method,
+      "[ _-]",
+      ""
+    ),
+    
+    Summed_Reads = as.numeric(Summed_Reads)
+  ) |>
+  
+  # Only actual detections
+  filter(
+    !is.na(Summed_Reads),
+    Summed_Reads > 0,
+    !is.na(Species_clean),
+    Species_clean != ""
+  )
+
+
+## OPTIONAL:
+## If you don't want "Unclassified" in the species confidence table,
+## uncomment the following line:
+
+# all_primers <- all_primers |>
+#   filter(tolower(Species_clean) != "unclassified")
+
+
+
+## 4. Check collection method names
+
+sort(unique(all_primers$Collection_Method))
+
+# Ideally this should show:
+#
+# "freezer"
+# "townet"
+# "water1"
+# "water2"
+# "water3"
+
+
+
+## 5. Collapse duplicate entries within method
+##
+## This is important in case a species occurs in multiple
+## rows for the same lake / primer / collection method.
+## ------------------------------------------------
+
+detection_detail <- all_primers |>
+  group_by(
+    Lake,
+    Species = Species_clean,
+    Primer,
+    Collection_Method
+  ) |>
+  summarise(
+    Reads = sum(Summed_Reads, na.rm = TRUE),
+    .groups = "drop"
+  ) |>
+  filter(Reads > 0)
+
+
+
+## 6. Determine sampling-method evidence
+##
+## Here we collapse across primers so that:
+## water1 detected with fwh + mlCO1 still counts as ONE water replicate.
+
+
+method_evidence <- detection_detail |>
+  group_by(
+    Lake,
+    Species,
+    Collection_Method
+  ) |>
+  summarise(
+    Reads_across_primers = sum(Reads),
+    .groups = "drop"
+  )
+
+
+
+## 7. Calculate confidence per Lake x Species
+##
+## RULES:
+##
+## HIGH:
+## >= 2 water replicates
+## AND
+## >= 1 townet or freezer detection
+##
+## MODERATE:
+## >= 2 water replicates
+## OR
+## >= 1 water replicate AND >= 1 townet/freezer
+##
+## LOW:
+## >= 1 water replicate
+## OR
+## >= 1 townet/freezer
+##
+## ------------------------------------------------
+
+confidence_table <- method_evidence |>
+  group_by(Lake, Species) |>
+  summarise(
+    
+    # Number of distinct water replicates with detection
+    Water_Replicates_Detected = n_distinct(
+      Collection_Method[
+        Collection_Method %in% c(
+          "water1",
+          "water2",
+          "water3"
+        )
+      ]
+    ),
+    
+    # Which water replicates?
+    Water_Replicates = paste(
+      sort(
+        unique(
+          Collection_Method[
+            Collection_Method %in% c(
+              "water1",
+              "water2",
+              "water3"
+            )
+          ]
+        )
+      ),
+      collapse = ", "
+    ),
+    
+    # Was it detected in townet and/or freezer?
+    Townet_or_Freezer_Detected = any(
+      Collection_Method %in% c(
+        "townet",
+        "freezer"
+      )
+    ),
+    
+    # Which of those?
+    Townet_Freezer_Methods = paste(
+      sort(
+        unique(
+          Collection_Method[
+            Collection_Method %in% c(
+              "townet",
+              "freezer"
+            )
+          ]
+        )
+      ),
+      collapse = ", "
+    ),
+    
+    .groups = "drop"
+  ) |>
+  
+  mutate(
+    Confidence = case_when(
+      
+      # HIGH
+      Water_Replicates_Detected >= 2 &
+        Townet_or_Freezer_Detected ~ "High",
+      
+      # MODERATE
+      Water_Replicates_Detected >= 2 ~ "Moderate",
+      
+      Water_Replicates_Detected >= 1 &
+        Townet_or_Freezer_Detected ~ "Moderate",
+      
+      # LOW
+      Water_Replicates_Detected >= 1 ~ "Low",
+      
+      Townet_or_Freezer_Detected ~ "Low",
+      
+      TRUE ~ NA_character_
+    )
+  )
+
+
+
+## 8. Determine which primers detected each species
+
+
+primer_detection <- detection_detail |>
+  group_by(Lake, Species) |>
+  summarise(
+    
+    Primers_Detected = paste(
+      sort(unique(Primer)),
+      collapse = ", "
+    ),
+    
+    Number_of_Primers = n_distinct(Primer),
+    
+    .groups = "drop"
+  )
+
+
+## 9. Calculate total reads PER PRIMER for each
+## Lake x Species
+## ------------------------------------------------
+
+primer_reads <- detection_detail |>
+  group_by(
+    Lake,
+    Species,
+    Primer
+  ) |>
+  summarise(
+    Reads = sum(Reads),
+    .groups = "drop"
+  ) |>
+  
+  pivot_wider(
+    names_from = Primer,
+    values_from = Reads,
+    values_fill = 0,
+    names_glue = "{Primer}_Reads"
+  )
+
+
+
+## 10. Join everything into table
+
+
+species_confidence <- confidence_table |>
+  
+  left_join(
+    primer_detection,
+    by = c("Lake", "Species")
+  ) |>
+  
+  left_join(
+    primer_reads,
+    by = c("Lake", "Species")
+  ) |>
+  
+  # Arrange columns in a logical order
+  select(
+    Lake,
+    Species,
+    Primers_Detected,
+    Number_of_Primers,
+    fwh_Reads,
+    mlCO1_Reads,
+    Uni18S_Reads,
+    Water_Replicates_Detected,
+    Water_Replicates,
+    Townet_or_Freezer_Detected,
+    Townet_Freezer_Methods,
+    Confidence
+  ) |>
+  
+  # Make confidence an ordered factor
+  mutate(
+    Confidence = factor(
+      Confidence,
+      levels = c(
+        "Low",
+        "Moderate",
+        "High"
+      ),
+      ordered = TRUE
+    )
+  ) |>
+  
+  arrange(
+    Lake,
+    desc(Confidence),
+    Species
+  )
+
+
+
+## 11. Save to Excel
+## ------------------------------------------------
+
+write.xlsx(
+  list(
+    
+    # Main confidence table
+    "Confidence summary" = species_confidence,
+    
+    # Detailed evidence showing reads for every
+    # primer and collection method
+    "Detection details" = detection_detail
+    
+  ),
+  
+  file = "Zooplankton_species_confidence_across_alllakes_and_3primers.xlsx",
+  overwrite = TRUE
+)
