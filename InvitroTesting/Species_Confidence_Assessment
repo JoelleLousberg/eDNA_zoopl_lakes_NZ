@@ -1,0 +1,50 @@
+## For all primer pairs separately, following code was run to assess species detetcion confidence:
+## Code was inserted after rarefaction and subsetting to zooplankton classes (~line 520).
+
+library(dplyr)
+# 1. Sum all ASVs belonging to the same species within each lake
+species_by_lake <- taxalist_by_sample |>
+  filter(!is.na(Species), Species != "") |>
+  group_by(Species, Lake) |>
+  summarise(Rarefied_Reads = sum(Abundance),.groups = "drop") |>
+  # Keep only actual detections
+  filter(Rarefied_Reads > 0)
+
+# 2. Summarise each species across the six lakes
+species_confidence <- species_by_lake |>
+  group_by(Species) |>
+  summarise(
+    Lakes_Detected = n_distinct(Lake),
+    Total_Rarefied_Reads = sum(Rarefied_Reads),
+    
+    # Useful for seeing where a species was detected
+    Lakes = paste(sort(unique(Lake)), collapse = ", "),
+    .groups = "drop") |>
+  
+  # 3. Assign confidence level
+  mutate(
+    Confidence = case_when(
+      # Detection in >= 2 lakes = high confidence
+      Lakes_Detected >= 2 ~ "High",
+      # Detection in only one lake:
+      Lakes_Detected == 1 & Total_Rarefied_Reads >= 110 ~ "High",
+      Lakes_Detected == 1 &
+        Total_Rarefied_Reads >= 11 &
+        Total_Rarefied_Reads < 110 ~ "Moderate",
+      Lakes_Detected == 1 & Total_Rarefied_Reads < 11 ~ "Low",
+      TRUE ~ NA_character_
+    )
+  ) |>
+  
+  # Optional: order confidence levels logically
+  mutate(
+    Confidence = factor(Confidence,levels = c("Low", "Moderate", "High"))
+  ) |>
+  arrange(desc(Confidence), desc(Total_Rarefied_Reads))
+
+# Look at table
+species_confidence
+
+write.xlsx(species_confidence, "species_confidence_level_with_ASV_rare.xlsx")
+
+##END CONFIDENCE TABLE ________________________________________________________________
