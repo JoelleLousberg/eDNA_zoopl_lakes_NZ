@@ -1,5 +1,5 @@
 
-## CONFIDENCE ASSESSMENT ACROSS 3 PRIMERS
+## Read counts for each species per lake including if it was found in water replicates, townet or frozen townet
 
 library(readr)
 library(dplyr)
@@ -83,14 +83,6 @@ all_primers <- all_primers |>
   )
 
 
-## OPTIONAL:
-## If you don't want "Unclassified" in the species confidence table,
-## uncomment the following line:
-
-# all_primers <- all_primers |>
-#   filter(tolower(Species_clean) != "unclassified")
-
-
 
 ## 4. Check collection method names
 
@@ -146,7 +138,8 @@ method_evidence <- detection_detail |>
 
 
 
-## 7. Calculate confidence per Lake x Species
+## OPTIONAL: We included a confidence analysis for each species for more detailed insights in the data analysis step 
+##7. Calculate confidence per Lake x Species
 ##
 ## RULES:
 ##
